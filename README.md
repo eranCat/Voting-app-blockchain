@@ -1,122 +1,141 @@
+## Install
 
-# Voting Dapp (Decentralized)
-
-Build Blockchain Voting Dapp (Decentralized) using Nextjs, Solidity, MetaMask & Hardhat | Voting App
-
-
-Complete the source code of the Ethereum Decentralized Voting project, With the final code & starter file to speed up your development if you are stuck in coding this project.
-
-Complete Web3 Dapp App, Build blockchain voting app, Web3 Project | Blockchain Voting App With Voting Smart Contract Solidity, Complete Project, voting smart contract solidity, solidity projects for beginners, solidity programming tutorial
-
-## Project Overview
-
-![alt text](https://www.daulathussain.com/wp-content/uploads/2023/04/voting-dapp.jpg)
-
-## Instruction
-
-Kindly follow the following Instructions to run the project in your system and install the necessary requirements
-
-
-- [Final Source Code](https://www.theblockchaincoders.com/sourceCode/ethereum-decentralized-voting-project-source-code)
-
-#### Setup Video
-- [Final Code Setup video](https://youtu.be/WKKJs31jEFQ?si=Vd3MsUOPmeN-H-33)
-
-```https://code.visualstudio.com/download
-  WATCH: Setup & Demo Of Project
+```bash
+npm i
+npm i -D @nomicfoundation/hardhat-toolbox @openzeppelin/contracts
+npm i merkletreejs keccak256
 ```
 
-#### Install Vs Code Editor
+> References: OpenZeppelin Merkle utilities, ethers v6 deployment patterns, Hardhat toolbox. 
 
-```https://code.visualstudio.com/download
-  GET: VsCode Editor
+---
+
+## Contracts
+
+* `contracts/BALToken.sol` — ERC-20 BAL (mintable by Voting contract).
+* `contracts/Voting.sol` — admin + whitelist + time window + voting + rewards + results (uses OZ `MerkleProof`).
+
+---
+
+## Configure whitelist & proofs
+
+1. Put voter addresses in `data/whitelist.json` (array of hex addresses).
+
+2. Generate the Merkle artifacts:
+
+```bash
+npx ts-node scripts/buildMerkle.ts
 ```
 
-#### NodeJs & NPM Version
+This writes:
 
-```https://nodejs.org/en/download
-  NodeJs: v18.12.1
-  NPM: 8.19.2
+* `data/merkle_root.txt` — paste this root into the contract via `setVoterMerkleRoot(...)`
+* `public/proofs.json` — used by the frontend to submit the correct proof
+
+> JS tree builder: `merkletreejs`. (If you prefer typed ergonomics, you can swap to `@openzeppelin/merkle-tree`.)
+
+---
+
+## Compile & Deploy
+
+Set your network in `hardhat.config.*` (RPC + private key), then:
+
+```bash
+npx hardhat compile
+npx hardhat run scripts/deploy.ts --network <your_network>
 ```
 
-#### Clone Starter File
+The deploy script uses ethers **v6** (`waitForDeployment()`, `getAddress()`):
 
-```https://github.com/daulathussain/Airdrop-Crypto-Starter-File
-  GET: Project Starter File Download
+```ts
+const BAL = await ethers.getContractFactory("BALToken");
+const bal = await BAL.deploy();
+await bal.waitForDeployment();
+console.log("BAL:", await bal.getAddress());
 ```
 
+---
 
-All you need to follow the complete project and follow the instructions which are explained in the tutorial by Daulat
+## Admin operations (after deploy)
 
-## Final Code Instruction
+From a script, Hardhat console, or your admin UI:
 
-If you download the final source code then you can follow the following instructions to run the Dapp successfully
+```ts
+// Set Merkle root from data/merkle_root.txt
+await voting.setVoterMerkleRoot("0x...");
 
-#### Setup Video
+// Election window (UNIX seconds)
+await voting.setElectionWindow(START_TS, END_TS);
 
-```https://code.visualstudio.com/download
-  WATCH: Setup & Demo Of Project
+// Optional: set reward (BAL per vote)
+await voting.setRewardAmount(ethers.parseUnits("10", 18));
+
+// Add candidates (name + 3 stance scores, 0–100)
+await voting.addCandidate("Alice", [70, 20, 80]);
+await voting.addCandidate("Bob",   [35, 85, 50]);
 ```
 
-#### Final Source Code
+When the window is open:
 
-```https://www.theblockchaincoders.com/SourceCode
-  Download the Final Source Code
+* Voters call `vote(candidateId, proof)` (manual)
+* Or `autoVote([a,b,c], proof)` (system picks closest candidate)
+
+After the window closes:
+
+```ts
+await voting.winner();         // (id, name, votes)
+await voting.sortedResults();  // array of candidates sorted by votes desc
 ```
 
-#### Install Vs Code Editor
+---
 
-```https://code.visualstudio.com/download
-  GET: VsCode Editor
+## Frontend hook-up (outline)
+
+* Load `public/proofs.json`, match `proofs[userAddress.toLowerCase()]`.
+* Show “Vote” buttons **only** if a proof exists for the user.
+* Add a countdown to `electionEnd`. Hide vote UI when closed; show `winner()` + `sortedResults()`.
+
+---
+
+## Troubleshooting
+
+**TS2307: Cannot find module 'keccak256' or 'merkletreejs'**
+
+```bash
+npm i merkletreejs keccak256
+npm i -D ts-node typescript @types/node
 ```
 
-#### NodeJs & NPM Version
+Then:
 
-```https://nodejs.org/en/download
-  NodeJs: v18.12.1
-  NPM: 8.19.2
+```bash
+npx ts-node scripts/buildMerkle.ts
+# or skip type-checking:
+npx ts-node --transpile-only scripts/buildMerkle.ts
 ```
 
-#### PInata
+**Ethers v6 differences**
 
-```https://www.pinata.cloud/
-  PINATA API KEY
-  PINATA SECRET KEY
-```
+* Use `await contract.waitForDeployment()` before interacting with a just-deployed contract.
+* Use `await contract.getAddress()` to read its address.
 
+**Merkle encoding must match**
 
-#### Test Faucets
+* Solidity leaf (in this project): `leaf = keccak256(bytes.concat(keccak256(abi.encode(voter))))`
+* Script mirrors that hashing before building the tree.
+* If you switch to OZ `StandardMerkleTree(["address"])`, the default is `keccak256(abi.encodePacked(address))` — change the Solidity leaf or JS accordingly. 
 
-Alchemy will provide you with some free test faucets which you can transfer to your wallet address for deploying the contract
+---
 
-```https://www.alchemy.com/faucets
-  Get: Free Test Faucets
-```
+## Security / gas notes
 
-#### RemixID
+* **Reentrancy**: protected where rewards mint. (No ETH transfers.)
+* **Double vote**: `hasVoted` guard.
+* **Sorting**: on-chain selection sort is ok for small N; if you expect many candidates, sort off-chain for the UI.
+* **Proof privacy**: proofs reveal allowlist membership; if you need commitment schemes, consider commit-reveal.
 
-We are using RemixID for deploying the contract and generation of the ABI in the project, but you can use any other tools like Hardhat, etc.
+---
 
-```https://remix-project.org
-  OPEN: RemixID
-```
+## Credits
 
-#### Polygon Mumbai
-
-```https://mumbai.polygonscan.com/
-  OPEN: Polygon Mumbai
-```
-
-## Important Links
-
-- [Get Pro Blockchain Developer Course](https://www.theblockchaincoders.com/pro-nft-marketplace)
-- [Support Creator](https://bit.ly/Support-Creator)
-- [All Projects Source Code](https://www.theblockchaincoders.com/SourceCode)
-
-
-## Authors
-
-- [@theblockchaincoders.com](https://www.theblockchaincoders.com/)
-- [@consultancy](https://www.theblockchaincoders.com/consultancy)
-- [@youtube](https://www.youtube.com/@daulathussain)
-
+This project started from Daulat Hussain’s public voting DApp starter and was extended to add Merkle allowlist, ERC-20 rewards, auto-vote and result APIs. ([GitHub][5])
