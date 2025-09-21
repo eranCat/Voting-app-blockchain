@@ -1,21 +1,31 @@
-import { ethers } from "hardhat";
+// scripts/deploy.ts
+import "dotenv/config";
+import hre from "hardhat";
+import { ContractFactory, JsonRpcProvider, Wallet } from "ethers";
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  const RPC = process.env.SEPOLIA_RPC_URL;
+  const PK = process.env.PRIVATE_KEY;
 
-  const BAL = await ethers.getContractFactory("BALToken");
-  const bal = await BAL.deploy();
-  await bal.waitForDeployment();
+  if (!RPC) throw new Error("Missing SEPOLIA_RPC_URL in .env");
+  if (!PK) throw new Error("Missing PRIVATE_KEY in .env");
 
-  const reward = ethers.parseUnits("10", 18); // e.g., 10 BAL per vote
-  const Voting = await ethers.getContractFactory("Voting");
-  const voting = await Voting.deploy(await bal.getAddress(), reward);
-  await voting.waitForDeployment();
+  // 1) Read compiled artifact via Hardhat (no plugin required)
+  const artifact = await hre.artifacts.readArtifact("BALToken"); 
 
-  await (await bal.setMinter(await voting.getAddress(), true)).wait();
+  // 2) Create provider & signer with pure ethers
+  const provider = new JsonRpcProvider(RPC);
+  const wallet = new Wallet(PK, provider);
 
-  console.log("BAL:", await bal.getAddress());
-  console.log("Voting:", await voting.getAddress());
+  // 3) Deploy
+  const factory = new ContractFactory(artifact.abi, artifact.bytecode, wallet);
+  const contract = await factory.deploy(/* constructor args if any */);
+  await contract.waitForDeployment();
+
+  console.log("Deployed at:", await contract.getAddress());
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

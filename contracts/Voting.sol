@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 interface IBAL { function mint(address to, uint256 amount) external; }
 
@@ -26,7 +26,7 @@ contract Voting is Ownable, ReentrancyGuard {
     event Voted(address indexed voter, uint256 indexed candidateId, bool autoMatched);
     event Rewarded(address indexed voter, uint256 amount);
 
-    constructor(address balToken, uint256 rewardPerVote) {
+    constructor(address balToken, uint256 rewardPerVote) Ownable(msg.sender){
         bal = IBAL(balToken);
         rewardAmount = rewardPerVote;
     }
@@ -109,3 +109,5 @@ contract Voting is Ownable, ReentrancyGuard {
         }
     }
 }
+
+

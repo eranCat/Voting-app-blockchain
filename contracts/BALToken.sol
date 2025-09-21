@@ -8,7 +8,7 @@ contract BALToken is ERC20, Ownable {
     mapping(address => bool) private minters;
     event MinterSet(address indexed account, bool allowed);
 
-    constructor() ERC20("BAL Token", "BAL") {}
+    constructor() ERC20("BAL Token", "BAL") Ownable(msg.sender) {}
 
     function setMinter(address account, bool allowed) external onlyOwner {
         minters[account] = allowed;
