@@ -1,9 +1,79 @@
-## Install
+
+# Decentralized Voting DApp
+
+A full-stack decentralized voting application featuring:
+- Whitelisted voting using Merkle proofs.
+- ERC-20 token rewards for voters.
+- Candidate management.
+- Time-window for elections.
+- A Next.js frontend for interaction.
+
+---
+
+## Technology Stack
+
+- **Smart Contracts**:
+  - Solidity
+  - Hardhat
+  - Ethers.js v6
+  - OpenZeppelin Contracts
+  - `merkletreejs` & `keccak256` for Merkle tree generation.
+- **Frontend**:
+  - Next.js
+  - React
+  - Tailwind CSS
+  - Ethers.js v6
+
+---
+
+## Project Structure
+
+```
+.
+├── contracts/
+│   ├── BALToken.sol      # ERC-20 reward token
+│   └── Voting.sol        # Main voting contract
+├── data/
+│   ├── whitelist.json    # List of whitelisted voter addresses
+│   ├── merkle_root.txt   # Generated Merkle root
+│   └── proofs.json       # Generated proofs (before being moved)
+├── frontend/gui/         # Next.js frontend application
+│   └── public/
+│       └── proofs.json   # Proofs file used by the frontend
+├── scripts/
+│   ├── buildMerkle.ts    # Script to generate Merkle tree from whitelist
+│   └── deploy.ts         # Deployment script for contracts
+├── hardhat.config.ts     # Hardhat configuration
+└── README.md
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js and npm
+- A wallet with funds for deployment and transactions (e.g., MetaMask).
+
+### 1. Installation
+
+Clone the repository and install the dependencies for both the root project and the frontend.
 
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd <repository-name>
+
+# Install root dependencies
 npm i
 npm i -D @nomicfoundation/hardhat-toolbox @openzeppelin/contracts
 npm i merkletreejs keccak256
+
+# Install frontend dependencies
+cd frontend/gui
+npm i
+cd ../..
 ```
 
 > References: OpenZeppelin Merkle utilities, ethers v6 deployment patterns, Hardhat toolbox. 
