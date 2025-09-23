@@ -1,18 +1,20 @@
 import { network } from "hardhat";
-import "dotenv/config";
+import { loadAddresses } from "../utils/addresses.js";
+
 
 async function main() {
-    const addr = process.env.VOTING_ADDR || process.argv[2];
-    if (!addr) throw new Error("Missing VOTING_ADDR (env) or CLI arg");
+    const { ethers } = await network.connect();
+    const { addrs } = await loadAddresses();
 
-    const { ethers } = await network.connect(); // HH3: ethers per NetworkConnection
-    const voting = await ethers.getContractAt("Voting", addr);
+    const voting = await ethers.getContractAt("Voting", addrs.Voting);
+    const [owner, start, end] = await Promise.all([
+        voting.owner(),
+        voting.electionStart(),
+        voting.electionEnd(),
+    ]);
 
-    const owner = await voting.owner();
-    const start = await voting.electionStart();
-    const end = await voting.electionEnd();
-
-    console.log("owner:", owner);
-    console.log("window:", start.toString(), end.toString());
+    console.log("Voting:", addrs.Voting);
+    console.log("Owner:", owner);
+    console.log("Window:", start.toString(), end.toString());
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch(e => { console.error(e); process.exit(1); });
