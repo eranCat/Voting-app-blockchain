@@ -167,6 +167,23 @@ await voting.sortedResults();  // array of candidates sorted by votes desc
 
 ---
 
+## Run the Frontend
+
+The frontend lives in `frontend/gui` and is a Next.js app.
+
+```bash
+# Go to the frontend folder
+cd frontend/gui
+
+# Install dependencies (first time only)
+npm install
+
+# Start the dev server
+npm run dev
+```
+
+---
+
 ## Troubleshooting
 
 **TS2307: Cannot find module 'keccak256' or 'merkletreejs'**
