@@ -1,24 +1,4 @@
-// scripts/deploy.ts
-// Hardhat v3 + Ethers v6 deployment for BALToken + Voting (constructor: address balToken, uint256 rewardPerVote).
-// - Uses network.connect() (HH3) to get ethers
-// - Deploys BALToken
-// - Deploys Voting with (balAddr, rewardPerVote)
-// - Writes data/addresses.<network>.json
-
 import { network, artifacts } from "hardhat";
-import * as fs from "fs/promises";
-import * as path from "path";
-
-function parseReward(): bigint {
-  // REWARD_PER_VOTE can be decimal string, interpreted as tokens (18 decimals)
-  // e.g. "10" -> 10 * 1e18
-  const raw = process.env.REWARD_PER_VOTE?.trim();
-  if (!raw) throw new Error("Missing REWARD_PER_VOTE in .env");
-  // ethers.parseUnits handles decimals correctly
-  return (global as any).ethers
-    ? (global as any).ethers.parseUnits(raw, 18)
-    : BigInt(0); // will be reassigned after network.connect()
-}
 
 async function main() {
   const { ethers } = await network.connect();
@@ -27,64 +7,51 @@ async function main() {
   const netLabel = process.env.HARDHAT_NETWORK ?? "network";
   console.log(`\n=== Deploying to ${netLabel} ===`);
 
-  // Read & parse reward now that ethers is available
-  const rewardPerVote: bigint = ethers.parseUnits(
-    (process.env.REWARD_PER_VOTE || "").trim(),
-    18
-  );
-
-  // 1) Deploy BALToken (no args)
-  const BAL = await ethers.getContractFactory("BALToken");
-  const bal = await BAL.deploy();
-  await bal.waitForDeployment();
-  const balAddr = await bal.getAddress();
-  console.log("BALToken:", balAddr);
-
-  // 2) Confirm Voting constructor matches (address, uint256)
-  const votingArtifact = await artifacts.readArtifact("Voting");
-  const ctor = (votingArtifact.abi as any[]).find((f) => f.type === "constructor");
-  const inputs = (ctor?.inputs as any[]) ?? [];
-  if (
-    inputs.length !== 2 ||
-    inputs[0].type !== "address" ||
-    inputs[1].type !== "uint256"
-  ) {
-    throw new Error(
-      `Voting constructor mismatch. Expected (address, uint256) but got (${inputs
-        .map((i) => i.type)
-        .join(", ")}).`
-    );
+  // 1) Reuse or deploy token
+  let tokenAddr = (process.env.REWARD_TOKEN_ADDRESS || "").trim();
+  if (!tokenAddr) {
+    const BALToken = await ethers.getContractFactory("BALToken");
+    const bal = await BALToken.deploy();
+    await bal.waitForDeployment();
+    // v6 uses .target
+    tokenAddr = (bal as any).target ?? (bal as any).address;
+    console.log("BALToken:", tokenAddr);
+  } else {
+    console.log("BALToken:", tokenAddr);
   }
 
-  // 3) Deploy Voting with (balAddr, rewardPerVote)
-  const Voting = await ethers.getContractFactory("Voting");
-  const voting = await Voting.deploy(balAddr, rewardPerVote);
-  await voting.waitForDeployment();
-  const votingAddr = await voting.getAddress();
-  console.log("Voting  :", votingAddr);
-
-  // 4) Write addresses
-  const outDir = path.join("data");
-  const outPath = path.join(outDir, `addresses.${netLabel}.json`);
-  await fs.mkdir(outDir, { recursive: true });
-  const payload = {
-    network: netLabel,
-    BAL: balAddr,
-    Voting: votingAddr,
-    rewardPerVote: rewardPerVote.toString(),
-    timestamp: new Date().toISOString(),
-  };
-  await fs.writeFile(outPath, JSON.stringify(payload, null, 2));
-  console.log(`\nAddresses written to ${outPath}\n`, payload);
-
-  // 5) Minimal sanity calls
+  // 2) Compute rewardPerVote (if needed)
+  let rewardPerVote: bigint | undefined;
   try {
-    const start = await (await ethers.getContractAt("Voting", votingAddr)).electionStart();
-    const end = await (await ethers.getContractAt("Voting", votingAddr)).electionEnd();
-    console.log(`Voting sanity: window=[${start}, ${end}]`);
+    const dec = await (new ethers.Contract(
+      tokenAddr,
+      ["function decimals() view returns (uint8)"],
+      (await ethers.getSigners())[0]
+    )).decimals();
+    const human = (process.env.REWARD_PER_VOTE || "10").trim();
+    rewardPerVote = ethers.parseUnits(human, dec);
   } catch {
-    console.log("Voting sanity: getters not callable yet (window not set) — that's fine.");
+    // ok, might not be needed if constructor is zero-arg
   }
+
+  // 3) Read ABI and decide args
+  const abiCtor =
+    (await artifacts.readArtifact("Voting")).abi.find((x: any) => x.type === "constructor");
+  const argCount = abiCtor?.inputs?.length ?? 0;
+
+  const Voting = await ethers.getContractFactory("Voting");
+  const args =
+    argCount === 2 ? [tokenAddr, rewardPerVote!] :
+      argCount === 0 ? [] :
+        (() => { throw new Error(`Unexpected Voting constructor with ${argCount} inputs`); })();
+
+  const voting = await Voting.deploy(...args);
+  await voting.waitForDeployment();
+  const votingAddr = (voting as any).target ?? (voting as any).address;
+  console.log("Voting:", votingAddr);
+
+  console.log("\nSet this for later scripts:");
+  console.log(`VOTING_ADDR=${votingAddr}`);
 }
 
 main().catch((e) => {

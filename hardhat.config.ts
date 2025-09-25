@@ -8,12 +8,12 @@ const config: HardhatUserConfig = {
     networks: {
         hardhat: { type: "edr-simulated", chainType: "l1" },
         sepolia: {
-            type: "http",            // ← חובה ב-HH3
+            type: "http",
             chainType: "l1",
             url: process.env.SEPOLIA_RPC_URL!,
             accounts: [process.env.PRIVATE_KEY!],
         },
     },
-    plugins: [hardhatEthers],     // ← רישום ה-plugin ב-HH3
+    plugins: [hardhatEthers],
 };
 export default config;

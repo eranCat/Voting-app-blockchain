@@ -7,6 +7,7 @@ const wl: string[] = JSON.parse(fs.readFileSync("data/whitelist.json", "utf8"));
 // leaves as single-field tuples [address] to mirror leaf encoding on-chain
 const tree = StandardMerkleTree.of(wl.map(a => [a.toLowerCase()]), ["address"]);
 const root = tree.root;
+console.log("Writing to data/merkle_root.txt");
 fs.writeFileSync("data/merkle_root.txt", root);
 
 // proofs map
@@ -15,5 +16,6 @@ for (const [i, v] of tree.entries()) {
   const addr = (v[0] as string).toLowerCase();
   proofs[addr] = tree.getProof(i);
 }
-fs.writeFileSync("public/proofs.json", JSON.stringify(proofs, null, 2));
+console.log("Writing to data/proofs/proofs.json");
+fs.writeFileSync("data/proofs/proofs.json", JSON.stringify(proofs, null, 2));
 console.log("Merkle Root:", root);

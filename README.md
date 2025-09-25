@@ -112,7 +112,7 @@ Set your network in `hardhat.config.*` (RPC + private key), then:
 
 ```bash
 npx hardhat compile
-npx hardhat run scripts/deploy.ts --network <your_network>
+npx hardhat run scripts/deploy.ts --network sepolia
 ```
 
 The deploy script uses ethers **v6** (`waitForDeployment()`, `getAddress()`):
