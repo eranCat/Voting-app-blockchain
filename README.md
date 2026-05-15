@@ -1,228 +1,196 @@
+# Voting App - Blockchain
 
-# Decentralized Voting DApp
+Decentralized voting application built on Ethereum blockchain with smart contracts for transparent, tamper-proof elections.
 
-A full-stack decentralized voting application featuring:
-- Whitelisted voting using Merkle proofs.
-- ERC-20 token rewards for voters.
-- Candidate management.
-- Time-window for elections.
-- A Next.js frontend for interaction.
+## Features
 
----
+- **Smart Contract Voting**: Immutable voting mechanism
+- **Blockchain Verification**: All votes recorded on-chain
+- **Voter Authentication**: Secure voter identity verification
+- **Real-time Results**: Live election results and analytics
+- **Multi-choice Elections**: Support various voting systems
+- **Transparency**: Public audit trail
+- **No Double Voting**: Built-in duplicate prevention
+- **Web3 Integration**: MetaMask and wallet support
 
-## Technology Stack
+## Tech Stack
 
-- **Smart Contracts**:
-  - Solidity
-  - Hardhat
-  - Ethers.js v6
-  - OpenZeppelin Contracts
-  - `merkletreejs` & `keccak256` for Merkle tree generation.
-- **Frontend**:
-  - Next.js
-  - React
-  - Tailwind CSS
-  - Ethers.js v6
+- **Smart Contracts**: Solidity
+- **Blockchain**: Ethereum
+- **Frontend**: TypeScript + React
+- **Web3 Integration**: Ethers.js / Web3.js
+- **Testing**: Hardhat + Mocha
+- **Deployment**: Hardhat / Truffle
 
----
+## Smart Contract Architecture
+
+```solidity
+contract Voting {
+    struct Candidate {
+        string name;
+        uint256 votes;
+    }
+    
+    struct Election {
+        string title;
+        uint256 startTime;
+        uint256 endTime;
+        Candidate[] candidates;
+    }
+}
+```
 
 ## Project Structure
 
 ```
-.
 ├── contracts/
-│   ├── BALToken.sol      # ERC-20 reward token
-│   └── Voting.sol        # Main voting contract
-├── data/
-│   ├── whitelist.json    # List of whitelisted voter addresses
-│   ├── merkle_root.txt   # Generated Merkle root
-│   └── proofs.json       # Generated proofs (before being moved)
-├── frontend/gui/         # Next.js frontend application
-│   └── public/
-│       └── proofs.json   # Proofs file used by the frontend
-├── scripts/
-│   ├── buildMerkle.ts    # Script to generate Merkle tree from whitelist
-│   └── deploy.ts         # Deployment script for contracts
-├── hardhat.config.ts     # Hardhat configuration
-└── README.md
+│   ├── Voting.sol          # Main voting contract
+│   ├── VotingFactory.sol   # Factory pattern
+│   └── VoterRegistry.sol   # Voter management
+├── frontend/
+│   ├── src/
+│   │   ├── components/     # React components
+│   │   ├── pages/          # Pages
+│   │   ├── hooks/          # Web3 hooks
+│   │   └── services/       # Contract services
+├── scripts/                # Deployment scripts
+├── test/                   # Contract tests
+└── hardhat.config.js       # Hardhat configuration
 ```
-
----
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js and npm
-- A wallet with funds for deployment and transactions (e.g., MetaMask).
+- Node.js 16+
+- MetaMask browser extension
+- Testnet ETH (Goerli/Sepolia)
 
-### 1. Installation
-
-Clone the repository and install the dependencies for both the root project and the frontend.
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd <repository-name>
-
-# Install root dependencies
-npm i
-npm i -D @nomicfoundation/hardhat-toolbox @openzeppelin/contracts
-npm i merkletreejs keccak256
-
-# Install frontend dependencies
-cd frontend/gui
-npm i
-cd ../..
-```
-
-> References: OpenZeppelin Merkle utilities, ethers v6 deployment patterns, Hardhat toolbox. 
-
----
-
-## Contracts
-
-* `contracts/BALToken.sol` — ERC-20 BAL (mintable by Voting contract).
-* `contracts/Voting.sol` — admin + whitelist + time window + voting + rewards + results (uses OZ `MerkleProof`).
-
----
-
-## Configure whitelist & proofs
-
-1. Put voter addresses in `data/whitelist.json` (array of hex addresses).
-
-2. Generate the Merkle artifacts:
+### Installation
 
 ```bash
-npx ts-node scripts/buildMerkle.ts
-```
-
-This writes:
-
-* `data/merkle_root.txt` — paste this root into the contract via `setVoterMerkleRoot(...)`
-* `public/proofs.json` — used by the frontend to submit the correct proof
-
-> JS tree builder: `merkletreejs`. (If you prefer typed ergonomics, you can swap to `@openzeppelin/merkle-tree`.)
-
----
-
-## Compile & Deploy
-
-Set your network in `hardhat.config.*` (RPC + private key), then:
-
-```bash
-npx hardhat compile
-npx hardhat run scripts/deploy.ts --network sepolia
-```
-
-The deploy script uses ethers **v6** (`waitForDeployment()`, `getAddress()`):
-
-```ts
-const BAL = await ethers.getContractFactory("BALToken");
-const bal = await BAL.deploy();
-await bal.waitForDeployment();
-console.log("BAL:", await bal.getAddress());
-```
-
----
-
-## Admin operations (after deploy)
-
-From a script, Hardhat console, or your admin UI:
-
-```ts
-// Set Merkle root from data/merkle_root.txt
-await voting.setVoterMerkleRoot("0x...");
-
-// Election window (UNIX seconds)
-await voting.setElectionWindow(START_TS, END_TS);
-
-// Optional: set reward (BAL per vote)
-await voting.setRewardAmount(ethers.parseUnits("10", 18));
-
-// Add candidates (name + 3 stance scores, 0–100)
-await voting.addCandidate("Alice", [70, 20, 80]);
-await voting.addCandidate("Bob",   [35, 85, 50]);
-```
-
-When the window is open:
-
-* Voters call `vote(candidateId, proof)` (manual)
-* Or `autoVote([a,b,c], proof)` (system picks closest candidate)
-
-After the window closes:
-
-```ts
-await voting.winner();         // (id, name, votes)
-await voting.sortedResults();  // array of candidates sorted by votes desc
-```
-
----
-
-## Frontend hook-up (outline)
-
-* Load `public/proofs.json`, match `proofs[userAddress.toLowerCase()]`.
-* Show “Vote” buttons **only** if a proof exists for the user.
-* Add a countdown to `electionEnd`. Hide vote UI when closed; show `winner()` + `sortedResults()`.
-
----
-
-## Run the Frontend
-
-The frontend lives in `frontend/gui` and is a Next.js app.
-
-```bash
-# Go to the frontend folder
-cd frontend/gui
-
-# Install dependencies (first time only)
+# Install dependencies
 npm install
 
-# Start the dev server
-npm run dev
+# Compile contracts
+npx hardhat compile
+
+# Deploy to testnet
+npx hardhat run scripts/deploy.js --network goerli
+
+# Start frontend
+cd frontend && npm start
 ```
 
----
+## Smart Contract Functions
 
-## Troubleshooting
+### Voter Functions
+```solidity
+function vote(uint256 electionId, uint256 candidateId) public
+function getVotingStatus() public view returns (bool)
+function registerVoter(address voter) public onlyAdmin
+```
 
-**TS2307: Cannot find module 'keccak256' or 'merkletreejs'**
+### Election Functions
+```solidity
+function createElection(string memory title) public onlyAdmin
+function addCandidate(uint256 electionId, string memory name) public onlyAdmin
+function getResults(uint256 electionId) public view
+function endElection(uint256 electionId) public onlyAdmin
+```
+
+## Testing
 
 ```bash
-npm i merkletreejs keccak256
-npm i -D ts-node typescript @types/node
+# Run contract tests
+npx hardhat test
+
+# Gas estimation
+npx hardhat test --gas-report
+
+# Coverage
+npx hardhat coverage
 ```
 
-Then:
+## Deployment
 
 ```bash
-npx ts-node scripts/buildMerkle.ts
-# or skip type-checking:
-npx ts-node --transpile-only scripts/buildMerkle.ts
+# Deploy to Goerli testnet
+npx hardhat run scripts/deploy.js --network goerli
+
+# Deploy to mainnet (be careful!)
+npx hardhat run scripts/deploy.js --network mainnet
+
+# Verify contract on Etherscan
+npx hardhat verify --network goerli DEPLOYED_ADDRESS
 ```
 
-**Ethers v6 differences**
+## Frontend Features
 
-* Use `await contract.waitForDeployment()` before interacting with a just-deployed contract.
-* Use `await contract.getAddress()` to read its address.
+### Voter Interface
+- Connect MetaMask wallet
+- View active elections
+- Cast votes
+- View personal voting history
+- Real-time result updates
 
-**Merkle encoding must match**
+### Admin Panel
+- Create new elections
+- Add candidates
+- Monitor voting
+- Close elections
+- View analytics
 
-* Solidity leaf (in this project): `leaf = keccak256(bytes.concat(keccak256(abi.encode(voter))))`
-* Script mirrors that hashing before building the tree.
-* If you switch to OZ `StandardMerkleTree(["address"])`, the default is `keccak256(abi.encodePacked(address))` — change the Solidity leaf or JS accordingly. 
+### Security Considerations
+
+1. **One-vote-per-address**: Smart contract prevents duplicate voting
+2. **Only registered voters**: Voter whitelist required
+3. **Time-locked elections**: Cannot vote before/after election period
+4. **Immutable audit trail**: All votes logged on blockchain
+5. **No vote modification**: Once cast, votes cannot be changed
+
+## Gas Optimization
+
+- Batch voter registration
+- Optimized storage layouts
+- View-only functions (no gas)
+- Efficient candidate storage
+
+## Common Issues
+
+### MetaMask Connection
+```javascript
+// Request account access
+const accounts = await window.ethereum.request({
+  method: 'eth_requestAccounts'
+});
+```
+
+### Network Switching
+```javascript
+// Switch to Goerli
+await window.ethereum.request({
+  method: 'wallet_switchEthereumChain',
+  params: [{ chainId: '0x5' }],
+});
+```
+
+## Roadmap
+
+- [ ] DAO governance integration
+- [ ] Multi-sig wallet support
+- [ ] Advanced voting mechanisms (ranked choice)
+- [ ] Mobile app
+- [ ] Layer 2 scaling (Polygon)
+- [ ] DAO treasury management
+
+## References
+
+- [Solidity Documentation](https://docs.soliditylang.org/)
+- [OpenZeppelin Contracts](https://docs.openzeppelin.com/contracts/)
+- [Hardhat Documentation](https://hardhat.org/docs)
+- [Ethers.js Documentation](https://docs.ethers.org/)
 
 ---
 
-## Security / gas notes
-
-* **Reentrancy**: protected where rewards mint. (No ETH transfers.)
-* **Double vote**: `hasVoted` guard.
-* **Sorting**: on-chain selection sort is ok for small N; if you expect many candidates, sort off-chain for the UI.
-* **Proof privacy**: proofs reveal allowlist membership; if you need commitment schemes, consider commit-reveal.
-
----
-
-## Credits
-
-This project started from Daulat Hussain’s public voting DApp starter and was extended to add Merkle allowlist, ERC-20 rewards, auto-vote and result APIs. ([GitHub][5])
+**Democratizing voting through blockchain technology** 🗳️⛓️
